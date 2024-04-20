@@ -38,5 +38,6 @@ def ParseArgs():
 	parser.add_argument('--eps', default=0.1, type=float, help='scaled weight as reward')
 	parser.add_argument('--approximate', dest='approximate', default=-1, type=int,
 						help='k-hop shortest path distance. -1 means exact shortest path')  # -1, 2
+	parser.add_argument('--exp_name', dest='experiment', default=None)
 	return parser.parse_args()
 args = ParseArgs()

@@ -9,6 +9,7 @@ from Utils.Utils import *
 from Utils.Utils import contrast
 import os
 import torch.nn as nn
+from torch.utils.tensorboard import SummaryWriter
 
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -24,6 +25,8 @@ class Coach:
         for met in mets:
             self.metrics['Train' + met] = list()
             self.metrics['Test' + met] = list()
+
+        self.writer = SummaryWriter(comment=args.experiment)
 
     def makePrint(self, name, ep, reses, save):
         ret = 'Epoch %d/%d, %s: ' % (ep, args.epoch, name)
@@ -51,11 +54,19 @@ class Coach:
             tstFlag = (ep % args.tstEpoch == 0)
             reses = self.trainEpoch()
             log(self.makePrint('Train', ep, reses, tstFlag))
+
+            self.writer.add_scalar("Loss/train", reses['Loss'], ep)
+            self.writer.add_scalar("preLoss/train", reses['preLoss'], ep)
+
             if tstFlag:
                 reses = self.testEpoch()
                 log(self.makePrint('Test', ep, reses, tstFlag))
                 self.saveHistory()
                 result.append(reses)
+
+                self.writer.add_scalar("Recall/test", reses['Recall'], ep)
+                self.writer.add_scalar("NDCG/test", reses['NDCG'], ep)
+
                 bestRes = reses if bestRes is None or reses['Recall'] > bestRes['Recall'] else bestRes
             print()
         reses = self.testEpoch()
@@ -64,6 +75,7 @@ class Coach:
         log(self.makePrint('Test', args.epoch, reses, True))
         log(self.makePrint('Best Result', args.epoch, bestRes, True))
         self.saveHistory()
+        self.writer.close()
 
     def prepareModel(self):
         self.gtLayer = GTLayer().cuda()
