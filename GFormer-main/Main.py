@@ -79,7 +79,7 @@ class Coach:
         self.writer.close()
 
     def prepareModel(self):
-        self.gtLayer = GTLayer().cuda()
+        self.gtLayer = nn.Sequential(*[GTLayer() for i in range(args.gt_gt_layer)]).cuda()
         self.model = Model(self.gtLayer).cuda()
         self.opt = t.optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=0)
         self.masker = RandomMaskSubgraphs(args.user, args.item)
