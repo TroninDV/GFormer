@@ -63,7 +63,7 @@ class Model(nn.Module):
             hidden = self.base_gcn(encoderAdj, embedsLst[-1])
             mean = self.gcn_mean(encoderAdj, hidden)
             logstd = self.gcn_logstddev(encoderAdj, hidden)
-            gaussian_noise = torch.randn(embeds.size(0), args.latdim)
+            gaussian_noise = torch.randn(embeds.size(0), args.latdim).cuda()
             embeds = gaussian_noise*torch.exp(logstd) + mean
 
         # embeds = sum(embedsLst)
@@ -81,7 +81,7 @@ class GCNLayer(nn.Module):
 
     def forward(self, adj, embeds):
         embeded = t.mm(embeds, self.weights)
-        return self.activation(t.spmm(adj, embeded))
+        return self.activation(t.spmm(adj, embeded)).cuda()
 
 
 class PNNLayer(nn.Module):
