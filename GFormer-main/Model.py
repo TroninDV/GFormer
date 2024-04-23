@@ -8,6 +8,8 @@ import networkx as nx
 import multiprocessing as mp
 import random
 
+from torch.nn.functional import relu
+
 init = nn.init.xavier_uniform_
 uniformInit = nn.init.uniform
 
@@ -17,10 +19,14 @@ class Model(nn.Module):
 
         self.uEmbeds = nn.Parameter(init(t.empty(args.user, args.latdim)))
         self.iEmbeds = nn.Parameter(init(t.empty(args.item, args.latdim)))
-        self.gcnLayers = nn.Sequential(*[GCNLayer() for i in range(args.gcn_layer)])
-        self.gcnLayer = GCNLayer()
+        self.gcnLayers = nn.Sequential(*[GCNLayer(args.latdim, args.latdim) for i in range(args.gcn_layer)])
+        self.gcnLayer = GCNLayer(args.latdim, args.latdim)
         self.gtLayers = gtLayer
         self.pnnLayers = nn.Sequential(*[PNNLayer() for i in range(args.pnn_layer)])
+
+        self.base_gcn = GCNLayer(args.latdim, args.latdim, activation=relu)
+        self.gcn_mean = GCNLayer(args.latdim, args.latdim)
+        self.gcn_logstddev = GCNLayer(args.latdim, args.latdim)
 
     def getEgoEmbeds(self):
         return t.cat([self.uEmbeds, self.iEmbeds], axis=0)
@@ -34,20 +40,33 @@ class Model(nn.Module):
         subList = [embeds, args.gtw*emb]
 
         for i, gcn in enumerate(self.gcnLayers):
-            embeds = gcn(encoderAdj, embedsLst[-1])
+            # embeds = gcn(encoderAdj, embedsLst[-1])
             embeds2 = gcn(sub, embedsLst[-1])
             embeds3 = gcn(cmp, embedsLst[-1])
             subList.append(embeds2)
-            embedsLst.append(embeds)
+            # embedsLst.append(embeds)
             cList.append(embeds3)
+
+    
+
+
         if is_test is False:
             for i, pnn in enumerate(self.pnnLayers):
                 embeds = pnn(handler, embedsLst[-1])
                 embedsLst.append(embeds)
+
+
         if decoderAdj is not None:
-            embeds, _ = self.gtLayers(decoderAdj, embedsLst[-1])
-            embedsLst.append(embeds)
-        embeds = sum(embedsLst)
+            # embeds, _ = self.gtLayers(decoderAdj, embedsLst[-1])
+            # embedsLst.append(embeds)
+
+            hidden = self.base_gcn(encoderAdj, embedsLst[-1])
+            mean = self.gcn_mean(encoderAdj, hidden)
+            logstd = self.gcn_logstddev(encoderAdj, hidden)
+            gaussian_noise = torch.randn(embeds.size(0), args.latdim)
+            embeds = gaussian_noise*torch.exp(logstd) + mean
+
+        # embeds = sum(embedsLst)
         cList = sum(cList)
         subList = sum(subList)
 
@@ -55,11 +74,14 @@ class Model(nn.Module):
 
 
 class GCNLayer(nn.Module):
-    def __init__(self):
-        super(GCNLayer, self).__init__()
+    def __init__(self, input_dim, output_dim, activation=lambda x: x):
+        super(GCNLayer, self, ).__init__()
+        self.weights = nn.Parameter(init(t.empty(input_dim, output_dim)))
+        self.activation = activation
 
     def forward(self, adj, embeds):
-        return t.spmm(adj, embeds)
+        embeded = t.mm(embeds, self.weights)
+        return self.activation(t.spmm(adj, embeded))
 
 
 class PNNLayer(nn.Module):
