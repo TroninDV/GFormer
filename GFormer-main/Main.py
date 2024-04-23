@@ -79,11 +79,11 @@ class Coach:
         self.writer.close()
 
     def prepareModel(self):
-        self.gtLayer = nn.Sequential(*[GTLayer() for i in range(args.gt_gt_layer)]).cuda()
+        self.gtLayer = [GTLayer().cuda() for i in range(args.gt_layer)]
         self.model = Model(self.gtLayer).cuda()
         self.opt = t.optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=0)
         self.masker = RandomMaskSubgraphs(args.user, args.item)
-        self.sampler = LocalGraph(self.gtLayer)
+        self.sampler = LocalGraph(self.gtLayer[0])
 
     def trainEpoch(self):
         trnLoader = self.handler.trnLoader

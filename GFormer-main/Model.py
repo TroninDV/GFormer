@@ -28,10 +28,16 @@ class Model(nn.Module):
     def forward(self, handler, is_test, sub, cmp, encoderAdj, decoderAdj=None):
         embeds = t.cat([self.uEmbeds, self.iEmbeds], axis=0)
         embedsLst = [embeds]
-        emb, _ = self.gtLayers(cmp, embeds)
-        cList = [embeds, args.gtw*emb]
-        emb, _ = self.gtLayers(sub, embeds)
-        subList = [embeds, args.gtw*emb]
+
+        cList = [embeds]
+        for gt_layer in self.gtLayers:
+            emb, _ = gt_layer(cmp, cList[-1])
+            cList.append(args.gtw*emb)
+        
+        subList = [embeds]
+        for gt_layer in self.gtLayers:
+            emb, _ = gt_layer(sub, subList[-1])
+            subList.append(args.gtw*emb)
 
         for i, gcn in enumerate(self.gcnLayers):
             embeds = gcn(encoderAdj, embedsLst[-1])
@@ -45,8 +51,9 @@ class Model(nn.Module):
                 embeds = pnn(handler, embedsLst[-1])
                 embedsLst.append(embeds)
         if decoderAdj is not None:
-            embeds, _ = self.gtLayers(decoderAdj, embedsLst[-1])
-            embedsLst.append(embeds)
+            for gt_layer in self.gtLayers:
+                embeds, _ = gt_layer(decoderAdj, embedsLst[-1])
+                embedsLst.append(embeds)
         embeds = sum(embedsLst)
         cList = sum(cList)
         subList = sum(subList)
