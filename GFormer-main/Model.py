@@ -74,14 +74,17 @@ class Model(nn.Module):
 
 
 class GCNLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, activation=lambda x: x):
+    def __init__(self, input_dim, output_dim, activation=None):
         super(GCNLayer, self, ).__init__()
         self.weights = nn.Parameter(init(t.empty(input_dim, output_dim)))
         self.activation = activation
 
     def forward(self, adj, embeds):
         embeded = t.mm(embeds, self.weights)
-        return self.activation(t.spmm(adj, embeded)).cuda()
+        if self.activation is None:
+            return t.spmm(adj, embeded).cuda()
+        else:
+            return self.activation(t.spmm(adj, embeded)).cuda()
 
 
 class PNNLayer(nn.Module):
