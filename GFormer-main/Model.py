@@ -64,7 +64,7 @@ class Model(nn.Module):
             mean = self.gcn_mean(encoderAdj, hidden)
             logstd = self.gcn_logstddev(encoderAdj, hidden)
             gaussian_noise = torch.randn(embeds.size(0), args.latdim).cuda()
-            embeds = gaussian_noise*torch.exp(logstd) + mean
+            embedsLst.append(gaussian_noise*torch.exp(logstd) + mean)
 
         # embeds = sum(embedsLst)
         cList = sum(cList)
