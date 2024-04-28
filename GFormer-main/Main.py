@@ -116,7 +116,8 @@ class Coach:
             ancEmbeds2 = usrEmbeds2[ancs]
             posEmbeds2 = itmEmbeds2[poss]
 
-            bprLoss = (-t.sum(ancEmbeds * posEmbeds, dim=-1)).mean()
+            # bprLoss = (-t.sum(ancEmbeds * posEmbeds, dim=-1)).mean()
+            bprLos = F.binary_cross_entropy(torch.ones_like(ancs), ancEmbeds @ posEmbeds.T)
             #
             scoreDiff = pairPredict(ancEmbeds2, posEmbeds2, negEmbeds)
             bprLoss2 = - (scoreDiff).sigmoid().log().sum() / args.batch
