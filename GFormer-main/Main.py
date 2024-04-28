@@ -1,3 +1,4 @@
+from collections import defaultdict
 import torch
 import Utils.TimeLogger as logger
 from Utils.TimeLogger import log
@@ -54,9 +55,9 @@ class Coach:
             tstFlag = (ep % args.tstEpoch == 0)
             reses = self.trainEpoch()
             log(self.makePrint('Train', ep, reses, tstFlag))
-
-            self.writer.add_scalar("Loss/train", reses['Loss'], ep)
-            self.writer.add_scalar("preLoss/train", reses['preLoss'], ep)
+            
+            for metric_name, metric_value in reses:
+                self.writer.add_scalar(f"{metric_name}/train", metric_value, ep)
 
             if tstFlag:
                 reses = self.testEpoch()
@@ -88,6 +89,9 @@ class Coach:
         trnLoader = self.handler.trnLoader
         trnLoader.dataset.negSampling()
         epLoss, epPreLoss = 0, 0
+
+        loss_parts = defaultdict(int)
+
         steps = trnLoader.dataset.__len__() // args.batch
         self.handler.preSelect_anchor_set()
         for i, tem in enumerate(trnLoader):
@@ -118,11 +122,25 @@ class Coach:
 
             regLoss = calcRegLoss(self.model) * args.reg
 
-            contrastLoss = (contrast(ancs, usrEmbeds) + contrast(poss, itmEmbeds)) * args.ssl_reg + contrast(
+            universalityLossDistinct = (contrast(ancs, usrEmbeds) + contrast(poss, itmEmbeds)) * args.ssl_reg
+
+            universalityLossCommon = contrast(
                 ancs,
                 usrEmbeds,
-                itmEmbeds) + args.ctra*contrastNCE(ancs, subLst, cList)
+                itmEmbeds)
+
+            contrastNCELoss = args.ctra*contrastNCE(ancs, subLst, cList)
+
+            contrastLoss = universalityLossDistinct + universalityLossCommon + contrastNCELoss
             loss = bprLoss + regLoss + contrastLoss + args.b2*bprLoss2
+
+            loss_parts['pos_embed_loss'] += bprLoss
+            loss_parts['contrast_embed_loss'] += bprLoss2
+            loss_parts['reg_loss'] += regLoss
+            loss_parts['universality_loss_distinct'] += universalityLossDistinct
+            loss_parts['universality_loss_common'] += universalityLossCommon
+            loss_parts['contrast_nce_loss'] += contrastNCELoss
+
 
             epLoss += loss.item()
             epPreLoss += bprLoss.item()
@@ -135,6 +153,10 @@ class Coach:
         ret = dict()
         ret['Loss'] = epLoss / steps
         ret['preLoss'] = epPreLoss / steps
+
+        for metric_name, metric_value in loss_parts.values():
+            ret[metric_name] = metric_value / steps
+
         return ret
 
     def testEpoch(self):
