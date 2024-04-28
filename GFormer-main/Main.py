@@ -1,16 +1,17 @@
-from collections import defaultdict
-import torch
-import Utils.TimeLogger as logger
-from Utils.TimeLogger import log
-from Params import args
-from Model import Model, RandomMaskSubgraphs, LocalGraph, GTLayer
-from DataHandler import DataHandler
+import os
 import pickle
+from collections import defaultdict
+
+import torch
+import torch.nn as nn
+import Utils.TimeLogger as logger
+from DataHandler import DataHandler
+from Model import GTLayer, LocalGraph, Model, RandomMaskSubgraphs
+from Params import args
+from torch.utils.tensorboard import SummaryWriter
+from Utils.TimeLogger import log
 from Utils.Utils import *
 from Utils.Utils import contrast
-import os
-import torch.nn as nn
-from torch.utils.tensorboard import SummaryWriter
 
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -56,7 +57,7 @@ class Coach:
             reses = self.trainEpoch()
             log(self.makePrint('Train', ep, reses, tstFlag))
             
-            for metric_name, metric_value in reses:
+            for metric_name, metric_value in reses.items():
                 self.writer.add_scalar(f"{metric_name}/train", metric_value, ep)
 
             if tstFlag:
@@ -134,12 +135,12 @@ class Coach:
             contrastLoss = universalityLossDistinct + universalityLossCommon + contrastNCELoss
             loss = bprLoss + regLoss + contrastLoss + args.b2*bprLoss2
 
-            loss_parts['pos_embed_loss'] += bprLoss
-            loss_parts['contrast_embed_loss'] += bprLoss2
-            loss_parts['reg_loss'] += regLoss
-            loss_parts['universality_loss_distinct'] += universalityLossDistinct
-            loss_parts['universality_loss_common'] += universalityLossCommon
-            loss_parts['contrast_nce_loss'] += contrastNCELoss
+            loss_parts['pos_embed_loss'] += bprLoss.item() 
+            loss_parts['contrast_embed_loss'] += bprLoss2.item() 
+            loss_parts['reg_loss'] += regLoss.item() 
+            loss_parts['universality_loss_distinct'] += universalityLossDistinct.item() 
+            loss_parts['universality_loss_common'] += universalityLossCommon.item() 
+            loss_parts['contrast_nce_loss'] += contrastNCELoss.item() 
 
 
             epLoss += loss.item()
@@ -154,7 +155,7 @@ class Coach:
         ret['Loss'] = epLoss / steps
         ret['preLoss'] = epPreLoss / steps
 
-        for metric_name, metric_value in loss_parts.values():
+        for metric_name, metric_value in loss_parts.items():
             ret[metric_name] = metric_value / steps
 
         return ret
