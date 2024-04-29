@@ -66,8 +66,8 @@ class Coach:
                 self.saveHistory()
                 result.append(reses)
 
-                self.writer.add_scalar("Recall/test", reses['Recall'], ep)
-                self.writer.add_scalar("NDCG/test", reses['NDCG'], ep)
+                for metric_name, metric_value in reses.items():
+                    self.writer.add_scalar(f"{metric_name}/test", metric_value, ep)
 
                 bestRes = reses if bestRes is None or reses['Recall'] > bestRes['Recall'] else bestRes
             print()
@@ -162,11 +162,18 @@ class Coach:
         return ret
 
     def testEpoch(self):
+        from collections import defaultdict
+
         tstLoader = self.handler.tstLoader
-        epLoss, epRecall, epNdcg = [0] * 3
+
+        epRecall = defaultdict(int)
+        epNdcg = defaultdict(int)
         i = 0
         num = tstLoader.dataset.__len__()
         steps = num // args.tstBat
+
+        k_values = [1, 5, 10, 20, 100]
+
         for usr, trnMask in tstLoader:
             i += 1
             usr = usr.long().cuda()
@@ -175,15 +182,17 @@ class Coach:
                                                           self.handler.torchBiAdj)
 
             allPreds = t.mm(usrEmbeds[usr], t.transpose(itmEmbeds, 1, 0)) * (1 - trnMask) - trnMask * 1e8
-            _, topLocs = t.topk(allPreds, args.topk)
-            recall, ndcg = self.calcRes(topLocs.cpu().numpy(), self.handler.tstLoader.dataset.tstLocs, usr)
-            epRecall += recall
-            epNdcg += ndcg
+            for k in k_values:
+                _, topLocs = t.topk(allPreds, k)
+                recall, ndcg = self.calcRes(topLocs.cpu().numpy(), self.handler.tstLoader.dataset.tstLocs, usr)
+            epRecall[k] += recall
+            epNdcg[k] += ndcg
             log('Steps %d/%d: recall = %.2f, ndcg = %.2f          ' % (i, steps, recall, ndcg), save=False,
                 oneline=True)
         ret = dict()
-        ret['Recall'] = epRecall / num
-        ret['NDCG'] = epNdcg / num
+        for k in k_values:
+            ret[f'Recall/@{k}'] = epRecall[k] / num
+            ret[f'NDCG/@{k}'] = epNdcg[k] / num
         return ret
 
     def calcRes(self, topLocs, tstLocs, batIds):
