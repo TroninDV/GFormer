@@ -117,8 +117,11 @@ class Coach:
             posEmbeds2 = itmEmbeds2[poss]
 
             # bprLoss = (-t.sum(ancEmbeds * posEmbeds, dim=-1)).mean()
-            bprLos = F.binary_cross_entropy(torch.ones_like(ancs), ancEmbeds @ posEmbeds.T)
-            #
+            # print(ancEmbeds.shape)
+            # print(t.sum(ancEmbeds * posEmbeds, dim=-1))
+            # print(torch.sigmoid(t.sum(ancEmbeds * posEmbeds, dim=-1)))
+            bprLoss = F.binary_cross_entropy(torch.sigmoid(t.sum(ancEmbeds * posEmbeds, dim=-1)), torch.ones_like(ancs, dtype=torch.float))
+
             scoreDiff = pairPredict(ancEmbeds2, posEmbeds2, negEmbeds)
             bprLoss2 = - (scoreDiff).sigmoid().log().sum() / args.batch
 
@@ -148,7 +151,9 @@ class Coach:
             epPreLoss += bprLoss.item()
             self.opt.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=20, norm_type=2)
+            # for par_name, par in self.model.named_parameters():
+            #     print(par_name, par.grad)
+            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=20, norm_type=2, error_if_nonfinite=True)
             self.opt.step()
             log('Step %d/%d: loss = %.3f, regLoss = %.3f, clLoss = %.3f        ' % (
                 i, steps, loss, regLoss, contrastLoss), save=False, oneline=True)

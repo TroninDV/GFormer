@@ -1,14 +1,14 @@
-import torch
-import torch as t
-from torch import nn
-from Params import args
-import scipy.sparse as sp
-import numpy as np
-import networkx as nx
 import multiprocessing as mp
 import random
 
-from torch.nn.functional import relu
+import networkx as nx
+import numpy as np
+import scipy.sparse as sp
+import torch
+import torch as t
+from Params import args
+from torch import nn
+from torch.nn.functional import normalize, relu
 
 init = nn.init.xavier_uniform_
 uniformInit = nn.init.uniform
@@ -60,13 +60,15 @@ class Model(nn.Module):
             # embeds, _ = self.gtLayers(decoderAdj, embedsLst[-1])
             # embedsLst.append(embeds)
 
-            hidden = self.base_gcn(encoderAdj, embedsLst[-1])
+            hidden = self.base_gcn(encoderAdj, sum(embedsLst))
             mean = self.gcn_mean(encoderAdj, hidden)
             logstd = self.gcn_logstddev(encoderAdj, hidden)
             gaussian_noise = torch.randn(embeds.size(0), args.latdim).cuda()
-            embedsLst.append(gaussian_noise*torch.exp(logstd) + mean)
+            embed = gaussian_noise*torch.exp(logstd) + mean
+            # print(f"{hidden=} {mean=} {logstd=} {embed=}")
+            embedsLst.append(embed)
 
-        # embeds = sum(embedsLst)
+        embeds = embedsLst[-1]
         cList = sum(cList)
         subList = sum(subList)
 
