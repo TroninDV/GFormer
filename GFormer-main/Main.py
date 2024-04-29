@@ -1,15 +1,16 @@
-import torch
-import Utils.TimeLogger as logger
-from Utils.TimeLogger import log
-from Params import args
-from Model import Model, RandomMaskSubgraphs, LocalGraph, GTLayer
-from DataHandler import DataHandler
+import os
 import pickle
+
+import torch
+import torch.nn as nn
+import Utils.TimeLogger as logger
+from DataHandler import DataHandler
+from Model import GTLayer, LocalGraph, Model, RandomMaskSubgraphs
+from Params import args
+from torch.utils.tensorboard import SummaryWriter
+from Utils.TimeLogger import log
 from Utils.Utils import *
 from Utils.Utils import contrast
-import os
-import torch.nn as nn
-from torch.utils.tensorboard import SummaryWriter
 
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -67,7 +68,7 @@ class Coach:
                 for metric_name, metric_value in reses.items():
                     self.writer.add_scalar(f"{metric_name}/test", metric_value, ep)
 
-                bestRes = reses if bestRes is None or reses['Recall'] > bestRes['Recall'] else bestRes
+                bestRes = reses if bestRes is None or reses['Recall/@20'] > bestRes['Recall/@20'] else bestRes
             print()
         reses = self.testEpoch()
         result.append(reses)
@@ -161,8 +162,8 @@ class Coach:
             for k in k_values:
                 _, topLocs = t.topk(allPreds, k)
                 recall, ndcg = self.calcRes(topLocs.cpu().numpy(), self.handler.tstLoader.dataset.tstLocs, usr)
-            epRecall[k] += recall
-            epNdcg[k] += ndcg
+                epRecall[k] += recall
+                epNdcg[k] += ndcg
             log('Steps %d/%d: recall = %.2f, ndcg = %.2f          ' % (i, steps, recall, ndcg), save=False,
                 oneline=True)
         ret = dict()
