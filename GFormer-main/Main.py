@@ -12,6 +12,8 @@ from Utils.TimeLogger import log
 from Utils.Utils import *
 from Utils.Utils import contrast
 
+from collections import defaultdict
+
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 
@@ -56,8 +58,9 @@ class Coach:
             reses = self.trainEpoch()
             log(self.makePrint('Train', ep, reses, tstFlag))
 
-            self.writer.add_scalar("Loss/train", reses['Loss'], ep)
-            self.writer.add_scalar("preLoss/train", reses['preLoss'], ep)
+            for metric_name, metric_value in reses.items():
+                self.writer.add_scalar(f"{metric_name}/train", metric_value, ep)
+
 
             if tstFlag:
                 reses = self.testEpoch()
@@ -91,6 +94,9 @@ class Coach:
         epLoss, epPreLoss = 0, 0
         steps = trnLoader.dataset.__len__() // args.batch
         self.handler.preSelect_anchor_set()
+
+        loss_parts = defaultdict(int)
+
         for i, tem in enumerate(trnLoader):
             if i % args.fixSteps == 0:
                 att_edge, add_adj = self.sampler(self.handler.torchBiAdj, self.model.getEgoEmbeds(),
@@ -119,11 +125,25 @@ class Coach:
 
             regLoss = calcRegLoss(self.model) * args.reg
 
-            contrastLoss = (contrast(ancs, usrEmbeds) + contrast(poss, itmEmbeds)) * args.ssl_reg + contrast(
+            universalityLossDistinct = (contrast(ancs, usrEmbeds) + contrast(poss, itmEmbeds)) * args.ssl_reg
+
+            universalityLossCommon = contrast(
                 ancs,
                 usrEmbeds,
-                itmEmbeds) + args.ctra*contrastNCE(ancs, subLst, cList)
+                itmEmbeds)
+
+            contrastNCELoss = args.ctra*contrastNCE(ancs, subLst, cList)
+
+            contrastLoss = universalityLossDistinct + universalityLossCommon + contrastNCELoss
             loss = bprLoss + regLoss + contrastLoss + args.b2*bprLoss2
+
+            loss_parts['pos_embed_loss'] += bprLoss.item() 
+            loss_parts['contrast_embed_loss'] += bprLoss2.item() 
+            loss_parts['reg_loss'] += regLoss.item() 
+            loss_parts['universality_loss_distinct'] += universalityLossDistinct.item() 
+            loss_parts['universality_loss_common'] += universalityLossCommon.item() 
+            loss_parts['contrast_nce_loss'] += contrastNCELoss.item() 
+
 
             epLoss += loss.item()
             epPreLoss += bprLoss.item()
@@ -136,6 +156,10 @@ class Coach:
         ret = dict()
         ret['Loss'] = epLoss / steps
         ret['preLoss'] = epPreLoss / steps
+
+        for metric_name, metric_value in loss_parts.items():
+            ret[metric_name] = metric_value / steps
+
         return ret
 
     def testEpoch(self):
