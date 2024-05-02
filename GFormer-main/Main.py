@@ -112,7 +112,11 @@ class Coach:
             ancEmbeds2 = usrEmbeds2[ancs]
             posEmbeds2 = itmEmbeds2[poss]
 
-            bprLoss = (-t.sum(ancEmbeds * posEmbeds, dim=-1)).mean()
+            
+
+            bprLoss = (-t.sum(ancEmbeds * posEmbeds, dim=-1)).mean() 
+
+            brpSameLoss = (-t.sum(ancEmbeds * ancEmbeds2, dim=-1).mean()) + (-t.sum(posEmbeds * posEmbeds2, dim=-1).mean())
             #
             scoreDiff = pairPredict(ancEmbeds2, posEmbeds2, negEmbeds)
             bprLoss2 = - (scoreDiff).sigmoid().log().sum() / args.batch
@@ -123,7 +127,7 @@ class Coach:
                 ancs,
                 usrEmbeds,
                 itmEmbeds) + args.ctra*contrastNCE(ancs, subLst, cList)
-            loss = bprLoss + regLoss + contrastLoss + args.b2*bprLoss2
+            loss = bprLoss + regLoss + contrastLoss + args.b2*bprLoss2 + brpSameLoss
 
             epLoss += loss.item()
             epPreLoss += bprLoss.item()
