@@ -24,9 +24,9 @@ class Model(nn.Module):
         self.gtLayers = gtLayer
         self.pnnLayers = nn.Sequential(*[PNNLayer() for i in range(args.pnn_layer)])
 
-        self.base_gcn = GCNLayer(args.latdim, args.latdim, activation=relu)
-        self.gcn_mean = GCNLayer(args.latdim, args.latdim)
-        self.gcn_logstddev = GCNLayer(args.latdim, args.latdim)
+        self.base_gcn = GCNLayer(args.latdim, args.latdim // 2, activation=relu)
+        self.gcn_mean = GCNLayer(args.latdim // 2, args.latdim)
+        self.gcn_logstddev = GCNLayer(args.latdim // 2, args.latdim)
 
     def getEgoEmbeds(self):
         return t.cat([self.uEmbeds, self.iEmbeds], axis=0)
@@ -47,12 +47,13 @@ class Model(nn.Module):
             # embedsLst.append(embeds)
             cList.append(embeds3)
 
-        hidden = self.base_gcn(encoderAdj, sum(embedsLst))
+        hidden = self.base_gcn(encoderAdj, embedsLst[-1])
         mean = self.gcn_mean(encoderAdj, hidden)
         logstd = self.gcn_logstddev(encoderAdj, hidden)
         gaussian_noise = torch.randn(embeds.size(0), args.latdim).cuda()
         embed = gaussian_noise*torch.exp(logstd) + mean
 
+        embedsLst.append(embed)
 
         if is_test is False:
             for i, pnn in enumerate(self.pnnLayers):
