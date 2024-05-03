@@ -47,7 +47,11 @@ class Model(nn.Module):
             # embedsLst.append(embeds)
             cList.append(embeds3)
 
-    
+        hidden = self.base_gcn(encoderAdj, sum(embedsLst))
+        mean = self.gcn_mean(encoderAdj, hidden)
+        logstd = self.gcn_logstddev(encoderAdj, hidden)
+        gaussian_noise = torch.randn(embeds.size(0), args.latdim).cuda()
+        embed = gaussian_noise*torch.exp(logstd) + mean
 
 
         if is_test is False:
@@ -57,18 +61,11 @@ class Model(nn.Module):
 
 
         if decoderAdj is not None:
-            # embeds, _ = self.gtLayers(decoderAdj, embedsLst[-1])
-            # embedsLst.append(embeds)
+            embeds, _ = self.gtLayers(decoderAdj, embedsLst[-1])
+            embedsLst.append(embeds)
 
-            hidden = self.base_gcn(encoderAdj, sum(embedsLst))
-            mean = self.gcn_mean(encoderAdj, hidden)
-            logstd = self.gcn_logstddev(encoderAdj, hidden)
-            gaussian_noise = torch.randn(embeds.size(0), args.latdim).cuda()
-            embed = gaussian_noise*torch.exp(logstd) + mean
-            # print(f"{hidden=} {mean=} {logstd=} {embed=}")
-            embedsLst.append(embed)
 
-        embeds = embedsLst[-1]
+        embeds = sum(embedsLst)
         cList = sum(cList)
         subList = sum(subList)
 
