@@ -69,7 +69,7 @@ class Coach:
                 for metric_name, metric_value in reses.items():
                     self.writer.add_scalar(f"{metric_name}/test", metric_value, ep)
 
-                bestRes = reses if bestRes is None or reses['Recall'] > bestRes['Recall'] else bestRes
+                bestRes = reses if bestRes is None or reses['Recall/@20'] > bestRes['Recall/@20'] else bestRes
             print()
         reses = self.testEpoch()
         result.append(reses)
@@ -116,11 +116,11 @@ class Coach:
             ancEmbeds2 = usrEmbeds2[ancs]
             posEmbeds2 = itmEmbeds2[poss]
 
-            # bprLoss = (-t.sum(ancEmbeds * posEmbeds, dim=-1)).mean()
+            bprLoss = (-t.sum(ancEmbeds * posEmbeds, dim=-1)).mean()
             # print(ancEmbeds.shape)
             # print(t.sum(ancEmbeds * posEmbeds, dim=-1))
             # print(torch.sigmoid(t.sum(ancEmbeds * posEmbeds, dim=-1)))
-            bprLoss = F.binary_cross_entropy(torch.sigmoid(t.sum(ancEmbeds * posEmbeds, dim=-1)), torch.ones_like(ancs, dtype=torch.float))
+            # bprLoss = F.binary_cross_entropy(torch.sigmoid(t.sum(ancEmbeds * posEmbeds, dim=-1)), torch.ones_like(ancs, dtype=torch.float))
 
             scoreDiff = pairPredict(ancEmbeds2, posEmbeds2, negEmbeds)
             bprLoss2 = - (scoreDiff).sigmoid().log().sum() / args.batch
@@ -151,8 +151,8 @@ class Coach:
             epPreLoss += bprLoss.item()
             self.opt.zero_grad()
             loss.backward()
-            # for par_name, par in self.model.named_parameters():
-            #     print(par_name, par.grad)
+            for par_name, par in self.model.named_parameters():
+                print(par_name, par.grad)
             nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=20, norm_type=2, error_if_nonfinite=True)
             self.opt.step()
             log('Step %d/%d: loss = %.3f, regLoss = %.3f, clLoss = %.3f        ' % (
